@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/admin",
+      "destination": "https://leadrvision-v2-six.vercel.app/site-admin/site-681eb8ad5e4faf2b8bf8dca1c0d72641c0f1",
+      "permanent": false
+    }
+  ]
+}
