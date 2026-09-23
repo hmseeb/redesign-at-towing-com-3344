@@ -20,8 +20,25 @@ Heavy Duty Towing · Car Lockouts · Jumpstarts · Luxury Auto Towing · 24 Hour
 index.html    single-page site (hero, about, why us, services, gallery, FAQ, contact, service areas)
 styles.css    monochrome brand system, responsive layout, motion
 script.js     mobile nav, services submenu, FAQ accordion, form validation, scroll reveal
+api/          serverless lead handler that posts form submissions to GoHighLevel
 favicon.svg   AT monogram favicon
 ```
+
+## Lead routing (GoHighLevel)
+
+Every form marked `data-ghl-form` posts to `/api/ghl-lead`, which upserts the
+contact in the GoHighLevel sub-account `K1fuM6V0oHLnUHKCRJdt` with first name,
+last name, phone and email, sets the custom fields **Lead Source** = `Website`
+and **Website Form** = the form's `data-form-name`, applies the
+**website-lead** tag and saves the message as a note on the contact. The
+visitor sees the thank-you message once the lead is accepted.
+
+Environment variables required by the deployment:
+
+| Variable | Purpose |
+| --- | --- |
+| `GHL_API_KEY` | GoHighLevel Private Integration token (v2 API) with contacts read/write access |
+| `GHL_LOCATION_ID` | Optional — overrides the default sub-account id |
 
 ## Design notes
 

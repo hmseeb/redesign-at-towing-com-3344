@@ -148,10 +148,11 @@
     sections.forEach(function (s) { spy.observe(s.el); });
   }
 
-  /* ---------------- contact form ---------------- */
-  var form = doc.getElementById('contact-form');
-  var okBox = doc.getElementById('form-ok');
-  var errBox = doc.getElementById('form-err');
+  /* ---------------- contact / quote forms ---------------- */
+  /* Submissions are delivered to the GoHighLevel sub-account through
+     /api/ghl-lead, which upserts the contact, stamps the Lead Source /
+     Website Form custom fields and applies the "website-lead" tag. */
+  var LEAD_ENDPOINT = '/api/ghl-lead';
 
   var RULES = {
     name: {
@@ -197,8 +198,21 @@
     return valid;
   }
 
-  if (form) {
+  function valueOf(form, names) {
+    for (var i = 0; i < names.length; i++) {
+      var el = form.elements[names[i]];
+      if (el && typeof el.value === 'string') return el.value.trim();
+    }
+    return '';
+  }
+
+  function initLeadForm(form) {
+    var okBox = form.querySelector('.form__status--ok');
+    var errBox = form.querySelector('.form__status--err');
+    var submitBtn = form.querySelector('[type="submit"]');
+    var submitLabel = submitBtn ? submitBtn.innerHTML : '';
     var inputs = Array.prototype.slice.call(form.querySelectorAll('input, textarea'));
+    var sending = false;
 
     inputs.forEach(function (input) {
       input.addEventListener('blur', function () { validateInput(input); });
@@ -208,8 +222,22 @@
       });
     });
 
+    function setSending(on) {
+      sending = on;
+      if (!submitBtn) return;
+      submitBtn.disabled = on;
+      submitBtn.innerHTML = on ? 'Sending&hellip;' : submitLabel;
+    }
+
+    function showStatus(box) {
+      if (!box) return;
+      box.hidden = false;
+      box.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' });
+    }
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      if (sending) return;
       if (okBox) okBox.hidden = true;
       if (errBox) errBox.hidden = true;
 
@@ -224,12 +252,49 @@
         return;
       }
 
-      // No backend is wired to this static site — confirm receipt and point
-      // the visitor at the 24/7 dispatch line, which is always fastest.
-      if (okBox) okBox.hidden = false;
-      form.reset();
-      inputs.forEach(function (input) { setError(input, ''); });
-      okBox && okBox.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' });
+      var payload = {
+        name: valueOf(form, ['name', 'full-name', 'fullname']),
+        firstName: valueOf(form, ['firstName', 'first-name', 'first_name']),
+        lastName: valueOf(form, ['lastName', 'last-name', 'last_name']),
+        email: valueOf(form, ['email']),
+        phone: valueOf(form, ['phone', 'tel', 'telephone']),
+        message: valueOf(form, ['message', 'comments', 'details']),
+        formName: form.getAttribute('data-form-name') || form.id || 'Website Form',
+        pageUrl: window.location.href
+      };
+
+      if (typeof window.fetch !== 'function') {
+        showStatus(errBox);
+        return;
+      }
+
+      setSending(true);
+
+      window.fetch(LEAD_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Request failed with status ' + res.status);
+          return res.json().catch(function () { return { ok: true }; });
+        })
+        .then(function (data) {
+          if (data && data.ok === false) throw new Error(data.error || 'Request rejected');
+          setSending(false);
+          form.reset();
+          inputs.forEach(function (input) { setError(input, ''); });
+          showStatus(okBox);
+        })
+        .catch(function (err) {
+          if (window.console && console.error) console.error('Lead submission failed:', err);
+          setSending(false);
+          showStatus(errBox);
+        });
     });
   }
+
+  Array.prototype.slice
+    .call(doc.querySelectorAll('form[data-ghl-form]'))
+    .forEach(initLeadForm);
 })();
