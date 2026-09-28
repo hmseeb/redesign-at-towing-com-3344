@@ -505,8 +505,11 @@
     </div>
 
     <div class="contact__form-wrap reveal">
-      <form class="form" id="contact-form" novalidate data-ghl-form data-form-name="Contact Us">
+      <form class="form" id="contact-form" method="POST" action="https://vision.leadrai.com/api/forms/5c45f1b219f871ef742e88a010265983" novalidate data-lead-form>
         <h3 class="form__title">Contact Us</h3>
+        <input type="hidden" name="_form" value="Contact">
+        <input type="hidden" name="_page" value="">
+        <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" style="display:none">
         <div class="field">
           <label for="name">Full Name</label>
           <input type="text" id="name" name="name" autocomplete="name" placeholder="Jane Doe" required>
@@ -524,7 +527,7 @@
         </div>
         <div class="field">
           <label for="message">How Can We Help You?</label>
-          <textarea id="message" name="message" rows="4" placeholder="Tell us your location, vehicle and what happened." required></textarea>
+          <textarea id="message" name="Message" rows="4" placeholder="Tell us your location, vehicle and what happened." required></textarea>
           <p class="field__error" data-error-for="message"></p>
         </div>
         <button class="btn btn--solid btn--block" type="submit">Send Message</button>

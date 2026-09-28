@@ -149,10 +149,9 @@
   }
 
   /* ---------------- contact / quote forms ---------------- */
-  /* Submissions are delivered to the GoHighLevel sub-account through
-     /api/ghl-lead, which upserts the contact, stamps the Lead Source /
-     Website Form custom fields and applies the "website-lead" tag. */
-  var LEAD_ENDPOINT = '/api/ghl-lead';
+  /* Submissions are delivered to LeadrVision. The same endpoint is set as
+     each form's action attribute, so the forms keep working without JS. */
+  var LEAD_ENDPOINT = 'https://vision.leadrai.com/api/forms/5c45f1b219f871ef742e88a010265983';
 
   var RULES = {
     name: {
@@ -167,7 +166,7 @@
       test: function (v) { return (v.replace(/\D/g, '').length >= 10); },
       msg: 'Please enter a phone number with at least 10 digits.'
     },
-    message: {
+    Message: {
       test: function (v) { return v.trim().length >= 10; },
       msg: 'Please tell us a little more about how we can help.'
     }
@@ -198,12 +197,25 @@
     return valid;
   }
 
-  function valueOf(form, names) {
-    for (var i = 0; i < names.length; i++) {
-      var el = form.elements[names[i]];
-      if (el && typeof el.value === 'string') return el.value.trim();
-    }
-    return '';
+  // Stamp the current page so visitors are returned to the right place.
+  function setPageField(form) {
+    var pageField = form.elements['_page'];
+    if (pageField) pageField.value = window.location.href;
+  }
+
+  // Collect every named field, so the payload mirrors a plain HTML submission.
+  function collectPayload(form) {
+    var payload = {};
+    Array.prototype.slice.call(form.elements).forEach(function (el) {
+      if (!el.name || el.disabled) return;
+      if (el.type === 'checkbox' || el.type === 'radio') {
+        if (!el.checked) return;
+      }
+      if (typeof el.value !== 'string') return;
+      payload[el.name] = el.value.trim();
+    });
+    payload._page = window.location.href;
+    return payload;
   }
 
   function initLeadForm(form) {
@@ -211,8 +223,11 @@
     var errBox = form.querySelector('.form__status--err');
     var submitBtn = form.querySelector('[type="submit"]');
     var submitLabel = submitBtn ? submitBtn.innerHTML : '';
-    var inputs = Array.prototype.slice.call(form.querySelectorAll('input, textarea'));
+    var inputs = Array.prototype.slice.call(form.querySelectorAll('input, textarea'))
+      .filter(function (el) { return el.type !== 'hidden' && el.name !== '_gotcha'; });
     var sending = false;
+
+    setPageField(form);
 
     inputs.forEach(function (input) {
       input.addEventListener('blur', function () { validateInput(input); });
@@ -235,7 +250,13 @@
       box.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' });
     }
 
+    // Show the confirmation after a plain (no-JS) submission round-trip.
+    if (/[?&]submitted=1(&|$)/.test(window.location.search) && okBox) {
+      okBox.hidden = false;
+    }
+
     form.addEventListener('submit', function (e) {
+      if (typeof window.fetch !== 'function') return; // let the browser POST it
       e.preventDefault();
       if (sending) return;
       if (okBox) okBox.hidden = true;
@@ -252,25 +273,11 @@
         return;
       }
 
-      var payload = {
-        name: valueOf(form, ['name', 'full-name', 'fullname']),
-        firstName: valueOf(form, ['firstName', 'first-name', 'first_name']),
-        lastName: valueOf(form, ['lastName', 'last-name', 'last_name']),
-        email: valueOf(form, ['email']),
-        phone: valueOf(form, ['phone', 'tel', 'telephone']),
-        message: valueOf(form, ['message', 'comments', 'details']),
-        formName: form.getAttribute('data-form-name') || form.id || 'Website Form',
-        pageUrl: window.location.href
-      };
-
-      if (typeof window.fetch !== 'function') {
-        showStatus(errBox);
-        return;
-      }
+      var payload = collectPayload(form);
 
       setSending(true);
 
-      window.fetch(LEAD_ENDPOINT, {
+      window.fetch(form.getAttribute('action') || LEAD_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -283,6 +290,7 @@
           if (data && data.ok === false) throw new Error(data.error || 'Request rejected');
           setSending(false);
           form.reset();
+          setPageField(form);
           inputs.forEach(function (input) { setError(input, ''); });
           showStatus(okBox);
         })
@@ -295,6 +303,6 @@
   }
 
   Array.prototype.slice
-    .call(doc.querySelectorAll('form[data-ghl-form]'))
+    .call(doc.querySelectorAll('form[data-lead-form]'))
     .forEach(initLeadForm);
 })();
